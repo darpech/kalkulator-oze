@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Calculator, Sun, Zap, TrendingUp, Calendar, DollarSign, Leaf, Info, ArrowRight, CheckCircle, Lightbulb, BarChart3, Settings, Battery, Printer, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart, Area } from 'recharts';
 
+// --- KONFIGURACJA GOOGLE ANALYTICS ---
+// Wklej tutaj swój identyfikator pomiaru (np. G-XXXXXXXXXX)
+const GA_TRACKING_ID = "G-0WTFWGC2JQ"; 
 // --- Helper Functions ---
 
 const formatCurrency = (value) => {
@@ -202,8 +205,50 @@ const Tooltip = ({ text }) => (
 );
 
 export default function App() {
+  // Google Analytics Injection
+  useEffect(() => {
+    if (GA_TRACKING_ID) {
+      const script1 = document.createElement("script");
+      script1.async = true;
+      script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
+      document.head.appendChild(script1);
+
+      const script2 = document.createElement("script");
+      script2.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '${GA_TRACKING_ID}');
+      `;
+      document.head.appendChild(script2);
+    }
+  }, []);
   // --- Global State ---
-  const [globalWibor, setGlobalWibor] = useState(4.27);
+  const [globalWibor, setGlobalWibor] = useState(4.00);
+  // Auto-fetch WIBOR
+  useEffect(() => {
+    const fetchWibor = async () => {
+      try {
+        // Using corsproxy.io to bypass CORS for stooq.pl CSV
+        const response = await fetch('https://corsproxy.io/?https://stooq.pl/q/l/?s=plopln3m&f=sd2t2olc&h&e=csv');
+        const text = await response.text();
+        // CSV format: Symbol,Date,Time,Open,Low,Close (Close is the value we want, or Open/Low since it's an index usually same)
+        // Example: PLOPLN3M,2025-12-23,12:00:00,4,4,4
+        const lines = text.trim().split('\n');
+        if (lines.length >= 2) {
+          const values = lines[1].split(',');
+          const wiborValue = parseFloat(values[values.length - 1]); // Last column is Close
+          if (!isNaN(wiborValue)) {
+             setGlobalWibor(wiborValue);
+             console.log("WIBOR updated:", wiborValue);
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to auto-fetch WIBOR:", error);
+      }
+    };
+    fetchWibor();
+  }, []);
   const [energyInflation, setEnergyInflation] = useState(3.0);
   
   // Tech Params
